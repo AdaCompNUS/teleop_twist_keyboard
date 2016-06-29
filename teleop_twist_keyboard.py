@@ -3,11 +3,15 @@ import roslib; roslib.load_manifest('teleop_twist_keyboard')
 import rospy
 
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 
 import sys, select, termios, tty
 
 msg = """
-Reading from the keyboard  and Publishing to Twist!
+SPACE to overtake control and start
+ESC to let go
+
+Reading from the keyboard and Publishing to Twist!
 ---------------------------
 Moving around:
    u    i    o
@@ -33,24 +37,24 @@ CTRL-C to quit
 """
 
 moveBindings = {
-		'i':(1,0,0,0),
-		'o':(1,0,0,-1),
-		'j':(0,0,0,1),
-		'l':(0,0,0,-1),
-		'u':(1,0,0,1),
-		',':(-1,0,0,0),
-		'.':(-1,0,0,1),
-		'm':(-1,0,0,-1),
-		'O':(1,-1,0,0),
-		'I':(1,0,0,0),
-		'J':(0,1,0,0),
-		'L':(0,-1,0,0),
-		'U':(1,1,0,0),
-		'<':(-1,0,0,0),
-		'>':(-1,-1,0,0),
-		'M':(-1,1,0,0),
-		't':(0,0,1,0),
-		'b':(0,0,-1,0),
+		'i':(1,0,0,0),	# forward
+		'o':(1,0,0,-1),	# forward		turn right
+		'j':(0,0,0,1),	# 				turn left
+		'l':(0,0,0,-1),	#				turn right
+		'u':(1,0,0,1),	# forward		turn left
+		',':(-1,0,0,0),	# backward
+		'.':(-1,0,0,1),	# backward		turn left
+		'm':(-1,0,0,-1),# backward		turn right
+		'O':(1,-1,0,0),	# forward	right
+		'I':(1,0,0,0),	# forward
+		'J':(0,1,0,0),	# left
+		'L':(0,-1,0,0),	# right
+		'U':(1,1,0,0),	# forward	left
+		'<':(-1,0,0,0),	# backward
+		'>':(-1,-1,0,0),# backward	right
+		'M':(-1,1,0,0),	# backward	left
+		't':(0,0,1,0),	# up
+		'b':(0,0,-1,0),	# down
 	       }
 
 speedBindings={
@@ -78,7 +82,8 @@ def vels(speed,turn):
 if __name__=="__main__":
     	settings = termios.tcgetattr(sys.stdin)
 	
-	pub = rospy.Publisher('cmd_vel', Twist, queue_size = 1)
+	pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size = 1)
+	pub_overtake = rospy.Publisher('fleye/debug/keyboard_overtake', Bool, queue_size = 1)
 	rospy.init_node('teleop_twist_keyboard')
 
 	x = 0
@@ -92,11 +97,13 @@ if __name__=="__main__":
 		print vels(speed,turn)
 		while(1):
 			key = getKey()
+			print "i heard", key
 			if key in moveBindings.keys():
 				x = moveBindings[key][0]
 				y = moveBindings[key][1]
 				z = moveBindings[key][2]
 				th = moveBindings[key][3]
+
 			elif key in speedBindings.keys():
 				speed = speed * speedBindings[key][0]
 				turn = turn * speedBindings[key][1]
@@ -110,7 +117,12 @@ if __name__=="__main__":
 				y = 0
 				z = 0
 				th = 0
-				if (key == '\x03'):
+				if (key == '\x20'):	# space
+					pub_overtake.publish(True)
+				if (key == '\x1B'):	# ESC
+					pub_overtake.publish(False)
+					continue
+				if (key == '\x03'):	# ctrl+c
 					break
 
 			twist = Twist()
